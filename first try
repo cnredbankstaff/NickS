@@ -1,0 +1,1506 @@
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nexus Arena</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&amp;family=Rajdhani:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; width:100%; overflow:hidden; font-family:'Rajdhani',sans-serif; background:#0a0a12; }
+canvas { display:block; width:100%; height:100%; }
+#game-container { position:relative; width:100%; height:100%; }
+
+/* HUD */
+#hud { position:absolute; top:0; left:0; right:0; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; pointer-events:none; z-index:10; }
+#hud > * { pointer-events:auto; }
+.hud-panel { background:rgba(8,8,20,0.85); border:1px solid rgba(0,255,200,0.25); border-radius:8px; padding:8px 16px; backdrop-filter:blur(8px); }
+.currency-display { display:flex; align-items:center; gap:8px; color:#00ffc8; font-family:'Orbitron',sans-serif; font-size:18px; font-weight:700; }
+.currency-icon { width:24px; height:24px; background:radial-gradient(circle,#ffd700,#ff8c00); border-radius:50%; border:2px solid #fff3; }
+
+/* Crosshair */
+#crosshair { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:6px; height:6px; border:2px solid rgba(0,255,200,0.6); border-radius:50%; pointer-events:none; z-index:5; display:none; }
+
+/* Menus / Overlays */
+.overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:50; background:rgba(5,5,15,0.92); backdrop-filter:blur(12px); }
+.overlay.hidden { display:none; }
+.menu-card { background:linear-gradient(135deg,rgba(15,15,35,0.95),rgba(25,20,50,0.95)); border:1px solid rgba(0,255,200,0.2); border-radius:16px; padding:32px; max-width:600px; width:90%; max-height:85%; overflow-y:auto; }
+.menu-card h2 { font-family:'Orbitron',sans-serif; color:#00ffc8; font-size:28px; margin-bottom:16px; text-align:center; }
+.menu-card h3 { font-family:'Orbitron',sans-serif; color:#a78bfa; font-size:18px; margin:12px 0 8px; }
+
+.btn { font-family:'Orbitron',sans-serif; padding:10px 24px; border:none; border-radius:8px; cursor:pointer; font-size:14px; font-weight:700; transition:all 0.2s; text-transform:uppercase; letter-spacing:1px; }
+.btn-primary { background:linear-gradient(135deg,#00ffc8,#00b894); color:#0a0a12; }
+.btn-primary:hover { transform:translateY(-2px); box-shadow:0 4px 20px rgba(0,255,200,0.4); }
+.btn-secondary { background:linear-gradient(135deg,#a78bfa,#7c3aed); color:#fff; }
+.btn-secondary:hover { transform:translateY(-2px); box-shadow:0 4px 20px rgba(167,139,250,0.4); }
+.btn-danger { background:linear-gradient(135deg,#f87171,#dc2626); color:#fff; }
+.btn-danger:hover { transform:translateY(-2px); box-shadow:0 4px 20px rgba(248,113,113,0.4); }
+.btn-sm { padding:6px 14px; font-size:11px; }
+
+/* Signs */
+.sign-text { color:#e2e8f0; font-size:14px; line-height:1.5; }
+
+/* Shop items */
+.shop-item { background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:16px; text-align:center; transition:all 0.2s; cursor:pointer; }
+.shop-item:hover { border-color:rgba(0,255,200,0.4); background:rgba(0,255,200,0.05); }
+.shop-item.owned { border-color:rgba(0,255,200,0.5); background:rgba(0,255,200,0.08); }
+.shop-item.equipped { border-color:#ffd700; background:rgba(255,215,0,0.1); box-shadow:0 0 12px rgba(255,215,0,0.2); }
+.item-preview { width:64px; height:64px; margin:0 auto 8px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:36px; }
+
+/* Difficulty cards */
+.diff-card { background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:20px; text-align:center; transition:all 0.2s; cursor:pointer; }
+.diff-card:hover { transform:translateY(-4px); }
+.diff-easy { border-color:rgba(52,211,153,0.4); }
+.diff-easy:hover { background:rgba(52,211,153,0.1); box-shadow:0 8px 24px rgba(52,211,153,0.2); }
+.diff-medium { border-color:rgba(251,191,36,0.4); }
+.diff-medium:hover { background:rgba(251,191,36,0.1); box-shadow:0 8px 24px rgba(251,191,36,0.2); }
+.diff-hard { border-color:rgba(248,113,113,0.4); }
+.diff-hard:hover { background:rgba(248,113,113,0.1); box-shadow:0 8px 24px rgba(248,113,113,0.2); }
+
+/* Toast */
+#toast-container { position:absolute; bottom:80px; left:50%; transform:translateX(-50%); z-index:100; display:flex; flex-direction:column; gap:8px; align-items:center; pointer-events:none; }
+.toast { padding:10px 24px; border-radius:8px; font-family:'Orbitron',sans-serif; font-size:13px; font-weight:700; animation:toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards; white-space:nowrap; }
+.toast-success { background:rgba(0,255,200,0.9); color:#0a0a12; }
+.toast-error { background:rgba(248,113,113,0.9); color:#fff; }
+.toast-info { background:rgba(167,139,250,0.9); color:#fff; }
+@keyframes toastIn { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+@keyframes toastOut { from { opacity:1; } to { opacity:0; } }
+
+/* Game timer */
+#game-timer { position:absolute; top:60px; left:50%; transform:translateX(-50%); z-index:10; font-family:'Orbitron',sans-serif; font-size:24px; color:#00ffc8; text-shadow:0 0 12px rgba(0,255,200,0.5); display:none; }
+
+/* Instructions */
+#instructions { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); z-index:10; color:rgba(255,255,255,0.5); font-size:12px; font-family:'Orbitron',sans-serif; pointer-events:none; letter-spacing:1px; }
+
+/* Minimap */
+#minimap { position:absolute; bottom:20px; right:20px; z-index:10; border:2px solid rgba(0,255,200,0.3); border-radius:8px; background:rgba(8,8,20,0.8); display:none; }
+
+/* Loading screen */
+#loading { position:absolute; inset:0; background:#0a0a12; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:200; }
+#loading h1 { font-family:'Orbitron',sans-serif; font-size:48px; color:#00ffc8; margin-bottom:16px; text-shadow:0 0 30px rgba(0,255,200,0.5); }
+#loading p { color:#a78bfa; font-family:'Rajdhani',sans-serif; font-size:18px; }
+.loading-bar { width:300px; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; margin-top:24px; overflow:hidden; }
+.loading-fill { height:100%; background:linear-gradient(90deg,#00ffc8,#a78bfa); border-radius:2px; animation:loadFill 2s ease forwards; }
+@keyframes loadFill { from { width:0; } to { width:100%; } }
+
+/* Scrollbar */
+::-webkit-scrollbar { width:6px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:rgba(0,255,200,0.3); border-radius:3px; }
+</style>
+  <style>body { box-sizing: border-box; }</style>
+ </head>
+ <body class="h-full w-full">
+  <div id="game-container">
+   <canvas id="gameCanvas"></canvas><!-- Loading Screen -->
+   <div id="loading">
+    <h1 id="loading-title">NEXUS ARENA</h1>
+    <p>Entering the arena...</p>
+    <div class="loading-bar">
+     <div class="loading-fill"></div>
+    </div>
+   </div><!-- HUD -->
+   <div id="hud" class="hidden">
+    <div class="hud-panel">
+     <div class="currency-display">
+      <div class="currency-icon"></div><span id="currency-amount">0</span>
+     </div>
+    </div>
+    <div style="display:flex;gap:8px;"><button class="btn btn-sm btn-secondary" id="btn-back-lobby" style="display:none;" onclick="returnToLobby()">← Lobby</button>
+    </div>
+   </div><!-- Crosshair -->
+   <div id="crosshair"></div><!-- Timer -->
+   <div id="game-timer"></div><!-- Instructions -->
+   <div id="instructions">
+    WASD to move · SPACE to jump · Walk into portals to enter
+   </div><!-- Minimap for maze -->
+   <canvas id="minimap" width="160" height="160"></canvas><!-- Toast container -->
+   <div id="toast-container"></div><!-- Parkour Difficulty Select -->
+   <div id="parkour-select" class="overlay hidden">
+    <div class="menu-card">
+     <h2>⛰️ PARKOUR CAVERN</h2>
+     <p class="sign-text" style="text-align:center;margin-bottom:20px;">Jump across floating platforms deep inside a crystal cave. Reach the end to earn rewards!</p>
+     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+      <div class="diff-card diff-easy" onclick="startParkour('easy')">
+       <div style="font-size:32px;margin-bottom:8px;">
+        🟢
+       </div>
+       <h3 style="color:#34d399;margin:0;">EASY</h3>
+       <p class="sign-text" style="font-size:12px;">Wide platforms<br>
+        Short gaps</p>
+       <p style="color:#ffd700;font-family:'Orbitron';font-size:13px;margin-top:8px;">+50 🪙</p>
+      </div>
+      <div class="diff-card diff-medium" onclick="startParkour('medium')">
+       <div style="font-size:32px;margin-bottom:8px;">
+        🟡
+       </div>
+       <h3 style="color:#fbbf24;margin:0;">MEDIUM</h3>
+       <p class="sign-text" style="font-size:12px;">Smaller platforms<br>
+        Moving blocks</p>
+       <p style="color:#ffd700;font-family:'Orbitron';font-size:13px;margin-top:8px;">+120 🪙</p>
+      </div>
+      <div class="diff-card diff-hard" onclick="startParkour('hard')">
+       <div style="font-size:32px;margin-bottom:8px;">
+        🔴
+       </div>
+       <h3 style="color:#f87171;margin:0;">HARD</h3>
+       <p class="sign-text" style="font-size:12px;">Tiny platforms<br>
+        Moving obstacles</p>
+       <p style="color:#ffd700;font-family:'Orbitron';font-size:13px;margin-top:8px;">+250 🪙</p>
+      </div>
+     </div>
+     <div style="text-align:center;margin-top:20px;"><button class="btn btn-danger btn-sm" onclick="closeParkourSelect()">Cancel</button>
+     </div>
+    </div>
+   </div><!-- Shop Overlay -->
+   <div id="shop-overlay" class="overlay hidden">
+    <div class="menu-card" style="max-width:700px;">
+     <h2>🛍️ COSMETIC SHOP</h2>
+     <p class="sign-text" style="text-align:center;margin-bottom:4px;">Customize your look! Cosmetics are visual only.</p>
+     <p style="text-align:center;margin-bottom:16px;"><span class="currency-display" style="display:inline-flex;font-size:16px;"> </span></p>
+     <div class="currency-icon" style="width:20px;height:20px;"></div><span id="shop-currency">0</span>
+     <p></p>
+     <div id="shop-tabs" style="display:flex;gap:8px;margin-bottom:16px;justify-content:center;"><button class="btn btn-sm btn-primary" onclick="showShopTab('hats')" id="tab-hats">Hats</button> <button class="btn btn-sm btn-secondary" onclick="showShopTab('masks')" id="tab-masks">Masks</button> <button class="btn btn-sm btn-secondary" onclick="showShopTab('faces')" id="tab-faces">Faces</button>
+     </div>
+     <div id="shop-items" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;"></div>
+     <div style="text-align:center;margin-top:20px;"><button class="btn btn-danger btn-sm" onclick="closeShop()">Close</button>
+     </div>
+    </div>
+   </div><!-- Win/Lose overlay -->
+   <div id="result-overlay" class="overlay hidden">
+    <div class="menu-card" style="text-align:center;">
+     <h2 id="result-title">🎉 VICTORY!</h2>
+     <p id="result-text" class="sign-text" style="font-size:18px;margin-bottom:8px;"></p>
+     <p id="result-reward" style="color:#ffd700;font-family:'Orbitron';font-size:20px;margin-bottom:20px;"></p><button class="btn btn-primary" onclick="returnToLobby()">Return to Lobby</button>
+    </div>
+   </div>
+  </div>
+  <script>
+// ============================================================
+// NEXUS ARENA - 3D Action Adventure Game
+// ============================================================
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// --- Game State ---
+let gameState = 'loading'; // loading, lobby, parkour, maze
+let playerData = null;
+let dataRecords = [];
+let currentShopTab = 'hats';
+let parkourDifficulty = 'easy';
+let mazeTimer = 0;
+let mazeTimerInterval = null;
+let gameStartTime = 0;
+
+// --- Player ---
+const player = {
+  x: 0, y: 1.5, z: 0,
+  vx: 0, vy: 0, vz: 0,
+  yaw: 0, pitch: 0,
+  grounded: false,
+  width: 0.6, height: 1.6,
+  speed: 4.5,
+  jumpForce: 8,
+  hat: 'none', mask: 'none', face: 'default'
+};
+
+// --- Camera ---
+const camera = {
+  x: 0, y: 3, z: 6,
+  targetX: 0, targetY: 3, targetZ: 6,
+  yaw: 0, pitch: 0.3,
+  distance: 5,
+  fov: 70
+};
+
+// --- Input ---
+const keys = {};
+let mouseX = 0, mouseY = 0;
+let isPointerLocked = false;
+
+// --- World Data ---
+let platforms = [];
+let portals = [];
+let enemies = [];
+let crystals = [];
+let signs = [];
+let mazeWalls = [];
+let mazeExit = null;
+let mazeGrid = [];
+const GRAVITY = -20;
+
+// --- Cosmetics ---
+const COSMETICS = {
+  hats: [
+    { id:'crown', name:'Crown', emoji:'👑', price:100 },
+    { id:'tophat', name:'Top Hat', emoji:'🎩', price:80 },
+    { id:'cap', name:'Cap', emoji:'🧢', price:50 },
+    { id:'wizard', name:'Wizard Hat', emoji:'🧙', price:150 },
+    { id:'helmet', name:'Knight Helm', emoji:'⛑️', price:200 },
+  ],
+  masks: [
+    { id:'robot', name:'Robot', emoji:'🤖', price:120 },
+    { id:'alien', name:'Alien', emoji:'👽', price:90 },
+    { id:'ninja', name:'Ninja', emoji:'🥷', price:110 },
+    { id:'skull', name:'Skull', emoji:'💀', price:160 },
+  ],
+  faces: [
+    { id:'cool', name:'Cool', emoji:'😎', price:60 },
+    { id:'fire', name:'Fire', emoji:'🔥', price:70 },
+    { id:'star', name:'Star Eyes', emoji:'🤩', price:80 },
+    { id:'ghost', name:'Ghost', emoji:'👻', price:100 },
+  ]
+};
+
+const PARKOUR_REWARDS = { easy: 50, medium: 120, hard: 250 };
+const MAZE_REWARD = 180;
+
+// --- Default Player Data ---
+function getDefaultPlayerData() {
+  return {
+    player_id: 'player_1',
+    currency: 0,
+    owned_cosmetics: '',
+    equipped_hat: 'none',
+    equipped_mask: 'none',
+    equipped_face: 'default',
+    parkour_easy_best: 0,
+    parkour_medium_best: 0,
+    parkour_hard_best: 0,
+    maze_wins: 0
+  };
+}
+
+// --- Element SDK ---
+const defaultConfig = {
+  game_title: 'NEXUS ARENA',
+  lobby_welcome: 'Welcome, adventurer!',
+  background_color: '#0a0a12',
+  surface_color: '#0f0f23',
+  text_color: '#e2e8f0',
+  primary_action_color: '#00ffc8',
+  secondary_action_color: '#a78bfa',
+  font_family: 'Orbitron',
+  font_size: 16
+};
+
+window.elementSdk.init({
+  defaultConfig,
+  onConfigChange: async (config) => {
+    const title = config.game_title || defaultConfig.game_title;
+    const el = document.getElementById('loading-title');
+    if (el) el.textContent = title;
+    document.body.style.background = config.background_color || defaultConfig.background_color;
+    const font = config.font_family || defaultConfig.font_family;
+    document.querySelectorAll('.hud-panel, .btn, .menu-card h2, #game-timer, #instructions').forEach(e => {
+      e.style.fontFamily = `${font}, Orbitron, sans-serif`;
+    });
+  },
+  mapToCapabilities: (config) => ({
+    recolorables: [
+      { get: () => config.background_color || defaultConfig.background_color, set: v => { config.background_color = v; window.elementSdk.setConfig({ background_color: v }); } },
+      { get: () => config.surface_color || defaultConfig.surface_color, set: v => { config.surface_color = v; window.elementSdk.setConfig({ surface_color: v }); } },
+      { get: () => config.text_color || defaultConfig.text_color, set: v => { config.text_color = v; window.elementSdk.setConfig({ text_color: v }); } },
+      { get: () => config.primary_action_color || defaultConfig.primary_action_color, set: v => { config.primary_action_color = v; window.elementSdk.setConfig({ primary_action_color: v }); } },
+      { get: () => config.secondary_action_color || defaultConfig.secondary_action_color, set: v => { config.secondary_action_color = v; window.elementSdk.setConfig({ secondary_action_color: v }); } },
+    ],
+    borderables: [],
+    fontEditable: { get: () => config.font_family || defaultConfig.font_family, set: v => { config.font_family = v; window.elementSdk.setConfig({ font_family: v }); } },
+    fontSizeable: { get: () => config.font_size || defaultConfig.font_size, set: v => { config.font_size = v; window.elementSdk.setConfig({ font_size: v }); } },
+  }),
+  mapToEditPanelValues: (config) => new Map([
+    ['game_title', config.game_title || defaultConfig.game_title],
+    ['lobby_welcome', config.lobby_welcome || defaultConfig.lobby_welcome],
+  ])
+});
+
+// --- Data SDK ---
+const dataHandler = {
+  onDataChanged(data) {
+    dataRecords = data;
+    if (data.length > 0) {
+      playerData = data[0];
+      player.hat = playerData.equipped_hat || 'none';
+      player.mask = playerData.equipped_mask || 'none';
+      player.face = playerData.equipped_face || 'default';
+      updateCurrencyUI();
+    }
+  }
+};
+
+async function initDataSDK() {
+  const result = await window.dataSdk.init(dataHandler);
+  if (!result.isOk) console.error('Data SDK init failed');
+}
+initDataSDK();
+
+function updateCurrencyUI() {
+  if (!playerData) return;
+  document.getElementById('currency-amount').textContent = playerData.currency || 0;
+  document.getElementById('shop-currency').textContent = playerData.currency || 0;
+}
+
+async function ensurePlayerData() {
+  if (!playerData) {
+    if (dataRecords.length === 0) {
+      const result = await window.dataSdk.create(getDefaultPlayerData());
+      if (!result.isOk) { showToast('Failed to create save data', 'error'); }
+    } else {
+      playerData = dataRecords[0];
+    }
+  }
+}
+
+async function addCurrency(amount) {
+  if (!playerData) return;
+  playerData.currency = (playerData.currency || 0) + amount;
+  const result = await window.dataSdk.update(playerData);
+  if (!result.isOk) showToast('Save failed', 'error');
+  updateCurrencyUI();
+}
+
+async function spendCurrency(amount) {
+  if (!playerData || (playerData.currency || 0) < amount) return false;
+  playerData.currency -= amount;
+  const result = await window.dataSdk.update(playerData);
+  if (!result.isOk) { showToast('Save failed', 'error'); return false; }
+  updateCurrencyUI();
+  return true;
+}
+
+async function saveCosmetic(type, id) {
+  if (!playerData) return;
+  playerData[`equipped_${type}`] = id;
+  await window.dataSdk.update(playerData);
+}
+
+async function ownCosmetic(id) {
+  if (!playerData) return;
+  let owned = playerData.owned_cosmetics ? playerData.owned_cosmetics.split(',') : [];
+  if (!owned.includes(id)) { owned.push(id); playerData.owned_cosmetics = owned.join(','); }
+  await window.dataSdk.update(playerData);
+}
+
+function isOwned(id) {
+  if (!playerData) return false;
+  const owned = playerData.owned_cosmetics ? playerData.owned_cosmetics.split(',') : [];
+  return owned.includes(id);
+}
+
+// --- Toast ---
+function showToast(msg, type='info') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = msg;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// --- Resize ---
+function resize() {
+  canvas.width = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// --- Input ---
+document.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'Space') e.preventDefault();
+});
+document.addEventListener('keyup', e => keys[e.code] = false);
+
+canvas.addEventListener('click', () => {
+  if (gameState === 'lobby' || gameState === 'parkour' || gameState === 'maze') {
+    canvas.requestPointerLock();
+  }
+});
+document.addEventListener('pointerlockchange', () => {
+  isPointerLocked = document.pointerLockElement === canvas;
+  document.getElementById('crosshair').style.display = isPointerLocked ? 'block' : 'none';
+});
+document.addEventListener('mousemove', e => {
+  if (isPointerLocked) {
+    camera.yaw -= e.movementX * 0.003;
+    camera.pitch = Math.max(-0.8, Math.min(1.0, camera.pitch - e.movementY * 0.003));
+  }
+});
+
+// ============================================================
+// 3D RENDERING ENGINE (Software Rasterizer)
+// ============================================================
+
+// Projection
+function project(x, y, z) {
+  // Transform relative to camera
+  const dx = x - camera.x;
+  const dy = y - camera.y;
+  const dz = z - camera.z;
+
+  // Rotate by camera yaw
+  const cosY = Math.cos(-camera.yaw);
+  const sinY = Math.sin(-camera.yaw);
+  let rx = dx * cosY - dz * sinY;
+  let rz = dx * sinY + dz * cosY;
+  let ry = dy;
+
+  // Rotate by pitch
+  const cosP = Math.cos(-camera.pitch);
+  const sinP = Math.sin(-camera.pitch);
+  let ry2 = ry * cosP - rz * sinP;
+  let rz2 = ry * sinP + rz * cosP;
+
+  if (rz2 < 0.1) return null;
+
+  const fov = camera.fov * (Math.PI / 180);
+  const scale = canvas.width / (2 * Math.tan(fov / 2));
+  const sx = canvas.width / 2 + (rx * scale) / rz2;
+  const sy = canvas.height / 2 - (ry2 * scale) / rz2;
+
+  return { x: sx, y: sy, z: rz2 };
+}
+
+// Draw filled quad (4 world-space points, color)
+function drawQuad(p1, p2, p3, p4, color, outline) {
+  const s1 = project(p1[0], p1[1], p1[2]);
+  const s2 = project(p2[0], p2[1], p2[2]);
+  const s3 = project(p3[0], p3[1], p3[2]);
+  const s4 = project(p4[0], p4[1], p4[2]);
+  if (!s1 || !s2 || !s3 || !s4) return;
+
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(s1.x, s1.y);
+  ctx.lineTo(s2.x, s2.y);
+  ctx.lineTo(s3.x, s3.y);
+  ctx.lineTo(s4.x, s4.y);
+  ctx.closePath();
+  ctx.fill();
+  if (outline) {
+    ctx.strokeStyle = outline;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+}
+
+// Draw a box
+function drawBox(x, y, z, w, h, d, topColor, sideColor1, sideColor2, outline) {
+  const hw = w/2, hd = d/2;
+
+  // Sort faces by distance (painter's algorithm for a single box)
+  const faces = [];
+  // Top
+  faces.push({ z: y+h, fn: () => drawQuad([x-hw,y+h,z-hd],[x+hw,y+h,z-hd],[x+hw,y+h,z+hd],[x-hw,y+h,z+hd], topColor, outline) });
+  // Front
+  faces.push({ z: z+hd, fn: () => drawQuad([x-hw,y,z+hd],[x+hw,y,z+hd],[x+hw,y+h,z+hd],[x-hw,y+h,z+hd], sideColor1, outline) });
+  // Back
+  faces.push({ z: z-hd, fn: () => drawQuad([x-hw,y,z-hd],[x+hw,y,z-hd],[x+hw,y+h,z-hd],[x-hw,y+h,z-hd], sideColor1, outline) });
+  // Left
+  faces.push({ z: x-hw, fn: () => drawQuad([x-hw,y,z-hd],[x-hw,y,z+hd],[x-hw,y+h,z+hd],[x-hw,y+h,z-hd], sideColor2, outline) });
+  // Right
+  faces.push({ z: x+hw, fn: () => drawQuad([x+hw,y,z-hd],[x+hw,y,z+hd],[x+hw,y+h,z+hd],[x+hw,y+h,z-hd], sideColor2, outline) });
+
+  faces.forEach(f => f.fn());
+}
+
+// Draw cylinder approximation (hexagonal)
+function drawCylinder(x, y, z, radius, height, color, topColor) {
+  const segments = 8;
+  for (let i = 0; i < segments; i++) {
+    const a1 = (i / segments) * Math.PI * 2;
+    const a2 = ((i + 1) / segments) * Math.PI * 2;
+    const x1 = x + Math.cos(a1) * radius;
+    const z1 = z + Math.sin(a1) * radius;
+    const x2 = x + Math.cos(a2) * radius;
+    const z2 = z + Math.sin(a2) * radius;
+
+    // Side face
+    drawQuad([x1,y,z1],[x2,y,z2],[x2,y+height,z2],[x1,y+height,z1], color);
+    // Top face
+    drawQuad([x,y+height,z],[x1,y+height,z1],[x2,y+height,z2],[x,y+height,z], topColor || color);
+  }
+}
+
+// Draw portal (glowing ring)
+function drawPortal(x, y, z, radius, color, label) {
+  const segments = 16;
+  const thickness = 0.15;
+  const time = Date.now() / 1000;
+
+  // Outer ring
+  for (let i = 0; i < segments; i++) {
+    const a1 = (i / segments) * Math.PI * 2;
+    const a2 = ((i + 1) / segments) * Math.PI * 2;
+    const pulse = 1 + Math.sin(time * 3 + i * 0.5) * 0.05;
+    const r = radius * pulse;
+    const ri = (radius - thickness) * pulse;
+
+    const x1o = x + Math.cos(a1) * r;
+    const y1o = y + Math.sin(a1) * r;
+    const x2o = x + Math.cos(a2) * r;
+    const y2o = y + Math.sin(a2) * r;
+    const x1i = x + Math.cos(a1) * ri;
+    const y1i = y + Math.sin(a1) * ri;
+    const x2i = x + Math.cos(a2) * ri;
+    const y2i = y + Math.sin(a2) * ri;
+
+    drawQuad([x1o,y1o,z],[x2o,y2o,z],[x2i,y2i,z],[x1i,y1i,z], color);
+  }
+
+  // Inner glow
+  const sp = project(x, y, z);
+  if (sp && sp.z > 0) {
+    const screenR = (radius * 400) / sp.z;
+    const grad = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, screenR);
+    grad.addColorStop(0, color + '60');
+    grad.addColorStop(0.6, color + '20');
+    grad.addColorStop(1, color + '00');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, screenR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Label
+    if (label && sp.z < 20) {
+      ctx.fillStyle = '#fff';
+      ctx.font = `bold ${Math.max(10, 18 - sp.z)}px Orbitron`;
+      ctx.textAlign = 'center';
+      ctx.fillText(label, sp.x, sp.y - screenR - 10);
+    }
+  }
+}
+
+// Draw player character
+function drawPlayer() {
+  const time = Date.now() / 1000;
+  const bob = player.grounded ? Math.sin(time * 8) * 0.05 : 0;
+
+  // Body
+  drawBox(player.x, player.y - 0.8 + bob, player.z, 0.5, 0.7, 0.3, '#2563eb', '#1d4ed8', '#1e40af');
+  // Head
+  drawBox(player.x, player.y + bob, player.z, 0.4, 0.4, 0.35, '#fcd34d', '#f59e0b', '#d97706');
+  // Legs
+  const legAnim = player.grounded ? Math.sin(time * 10) * 0.1 : 0;
+  drawBox(player.x - 0.12, player.y - 1.5 + bob + legAnim, player.z, 0.18, 0.7, 0.2, '#1e293b', '#0f172a', '#1e293b');
+  drawBox(player.x + 0.12, player.y - 1.5 + bob - legAnim, player.z, 0.18, 0.7, 0.2, '#1e293b', '#0f172a', '#1e293b');
+
+  // Hat cosmetic
+  if (player.hat !== 'none') {
+    const hatItem = COSMETICS.hats.find(h => h.id === player.hat);
+    if (hatItem) {
+      const hp = project(player.x, player.y + 0.55 + bob, player.z);
+      if (hp && hp.z > 0) {
+        const s = Math.max(12, 32 - hp.z * 2);
+        ctx.font = `${s}px serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(hatItem.emoji, hp.x, hp.y);
+      }
+    }
+  }
+  // Face
+  if (player.face !== 'default') {
+    const faceItem = COSMETICS.faces.find(f => f.id === player.face);
+    if (faceItem) {
+      const fp = project(player.x, player.y + 0.15 + bob, player.z + 0.2);
+      if (fp && fp.z > 0) {
+        const s = Math.max(8, 20 - fp.z * 2);
+        ctx.font = `${s}px serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(faceItem.emoji, fp.x, fp.y);
+      }
+    }
+  }
+}
+
+// Draw crystal
+function drawCrystal(x, y, z, color, size) {
+  const time = Date.now() / 1000;
+  const glow = 0.6 + Math.sin(time * 2 + x + z) * 0.4;
+  const s = size || 0.3;
+
+  // Diamond shape
+  drawQuad([x,y,z-s],[x+s,y+s*1.5,z],[x,y+s*3,z],[x-s,y+s*1.5,z], color + Math.floor(glow * 255).toString(16).padStart(2,'0'));
+
+  // Glow
+  const sp = project(x, y + s * 1.5, z);
+  if (sp && sp.z > 0 && sp.z < 30) {
+    const r = (s * 300) / sp.z;
+    const grad = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, r);
+    grad.addColorStop(0, color + '40');
+    grad.addColorStop(1, color + '00');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// Draw enemy (red glowing entity)
+function drawEnemy(enemy) {
+  const time = Date.now() / 1000;
+  const hover = Math.sin(time * 3 + enemy.x) * 0.15;
+
+  // Body
+  drawBox(enemy.x, enemy.y + hover, enemy.z, 0.6, 0.9, 0.4, '#dc2626', '#b91c1c', '#991b1b');
+  // Eyes
+  const ep = project(enemy.x, enemy.y + 0.7 + hover, enemy.z + 0.25);
+  if (ep && ep.z > 0) {
+    const s = Math.max(3, 10 - ep.z);
+    ctx.fillStyle = '#fef08a';
+    ctx.beginPath();
+    ctx.arc(ep.x - s, ep.y, s * 0.5, 0, Math.PI * 2);
+    ctx.arc(ep.x + s, ep.y, s * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Glow
+  const sp = project(enemy.x, enemy.y + 0.5, enemy.z);
+  if (sp && sp.z > 0 && sp.z < 25) {
+    const r = 200 / sp.z;
+    const grad = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, r);
+    grad.addColorStop(0, '#dc262640');
+    grad.addColorStop(1, '#dc262600');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// Draw sign
+function drawSign(x, y, z, text) {
+  // Post
+  drawBox(x, y, z, 0.1, 1.5, 0.1, '#78350f', '#92400e', '#78350f');
+  // Board
+  drawBox(x, y + 1.5, z, 1.5, 0.8, 0.08, '#451a03', '#78350f', '#78350f');
+
+  const sp = project(x, y + 1.8, z + 0.1);
+  if (sp && sp.z > 0 && sp.z < 15) {
+    const fontSize = Math.max(8, 14 - sp.z);
+    ctx.fillStyle = '#fcd34d';
+    ctx.font = `bold ${fontSize}px Rajdhani`;
+    ctx.textAlign = 'center';
+    const lines = text.split('\n');
+    lines.forEach((line, i) => {
+      ctx.fillText(line, sp.x, sp.y + i * (fontSize + 2) - ((lines.length - 1) * fontSize) / 2);
+    });
+  }
+}
+
+// ============================================================
+// WORLD BUILDING
+// ============================================================
+
+function buildLobby() {
+  platforms = [];
+  portals = [];
+  crystals = [];
+  signs = [];
+  enemies = [];
+  mazeWalls = [];
+
+  // Floor
+  platforms.push({ x:0, y:-0.5, z:0, w:30, h:1, d:30, color:'#1a1a2e', top:'#16213e', side:'#0f3460' });
+
+  // Walls
+  platforms.push({ x:0, y:3, z:-15, w:30, h:7, d:0.5, color:'#0f0f23', top:'#0f0f23', side:'#1a1a3e' });
+  platforms.push({ x:0, y:3, z:15, w:30, h:7, d:0.5, color:'#0f0f23', top:'#0f0f23', side:'#1a1a3e' });
+  platforms.push({ x:-15, y:3, z:0, w:0.5, h:7, d:30, color:'#0f0f23', top:'#0f0f23', side:'#1a1a3e' });
+  platforms.push({ x:15, y:3, z:0, w:0.5, h:7, d:30, color:'#0f0f23', top:'#0f0f23', side:'#1a1a3e' });
+
+  // Decorative platforms
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2;
+    platforms.push({
+      x: Math.cos(angle) * 10, y: 0, z: Math.sin(angle) * 10,
+      w: 2, h: 0.3, d: 2,
+      color: '#1e1b4b', top: '#312e81', side: '#1e1b4b'
+    });
+  }
+
+  // Portals
+  portals.push({ x: -8, y: 2.5, z: -12, radius: 2, color: '#f97316', label: 'PARKOUR CAVERN', target: 'parkour' });
+  portals.push({ x: 8, y: 2.5, z: -12, radius: 2, color: '#3b82f6', label: 'MAZE QUEST', target: 'maze' });
+  portals.push({ x: 0, y: 2.5, z: -12, radius: 1.8, color: '#a855f7', label: 'SHOP', target: 'shop' });
+
+  // Signs
+  signs.push({ x: -8, y: 0, z: -8, text: 'PARKOUR CAVERN\nJump across platforms\nin a crystal cave!' });
+  signs.push({ x: 8, y: 0, z: -8, text: 'MAZE QUEST\nEscape the maze\nbefore enemies catch you!' });
+  signs.push({ x: 0, y: 0, z: -8, text: 'COSMETIC SHOP\nSpend your coins\non cool cosmetics!' });
+
+  // Crystals
+  for (let i = 0; i < 20; i++) {
+    crystals.push({
+      x: (Math.random() - 0.5) * 28,
+      y: 0,
+      z: (Math.random() - 0.5) * 28,
+      color: ['#00ffc8','#a78bfa','#f97316','#3b82f6','#ec4899'][Math.floor(Math.random()*5)],
+      size: 0.2 + Math.random() * 0.3
+    });
+  }
+
+  // Floor glow strips
+  for (let i = -12; i <= 12; i += 4) {
+    platforms.push({ x: i, y: 0.01, z: 0, w: 0.15, h: 0.02, d: 28, color: '#00ffc830', top: '#00ffc850', side: '#00ffc820', glow: true });
+  }
+
+  player.x = 0; player.y = 1.5; player.z = 8;
+  camera.yaw = 0; camera.pitch = 0.2;
+}
+
+function buildParkour(difficulty) {
+  platforms = [];
+  portals = [];
+  crystals = [];
+  signs = [];
+  enemies = [];
+  mazeWalls = [];
+
+  let platW, platD, gapMin, gapMax, count, moving;
+  if (difficulty === 'easy') {
+    platW = 2.5; platD = 2.5; gapMin = 2; gapMax = 3.5; count = 15; moving = 0;
+  } else if (difficulty === 'medium') {
+    platW = 1.8; platD = 1.8; gapMin = 2.5; gapMax = 4; count = 20; moving = 5;
+  } else {
+    platW = 1.2; platD = 1.2; gapMin = 3; gapMax = 5; count = 25; moving = 10;
+  }
+
+  // Start platform
+  platforms.push({ x:0, y:0, z:0, w:4, h:1, d:4, color:'#1a1a2e', top:'#22c55e', side:'#166534' });
+
+  let px = 0, pz = 0, py = 0;
+  for (let i = 0; i < count; i++) {
+    const dir = Math.random() > 0.5 ? 1 : -1;
+    const gap = gapMin + Math.random() * (gapMax - gapMin);
+    const heightChange = (Math.random() - 0.3) * 1.5;
+
+    if (Math.random() > 0.5) {
+      pz -= gap;
+    } else {
+      px += dir * gap;
+    }
+    py = Math.max(0, py + heightChange);
+
+    const isMoving = i >= count - moving;
+    platforms.push({
+      x: px, y: py, z: pz,
+      w: platW, h: 0.5, d: platD,
+      color: '#374151', top: isMoving ? '#f59e0b' : '#6b7280', side: '#1f2937',
+      moving: isMoving,
+      moveAxis: Math.random() > 0.5 ? 'x' : 'z',
+      moveRange: 1.5 + Math.random() * 1.5,
+      moveSpeed: 1 + Math.random(),
+      baseX: px, baseZ: pz
+    });
+  }
+
+  // End platform
+  pz -= 4;
+  platforms.push({ x:px, y:py, z:pz, w:4, h:1, d:4, color:'#1a1a2e', top:'#fbbf24', side:'#92400e', isEnd: true });
+
+  // Crystals along the path
+  for (let i = 0; i < 30; i++) {
+    const rp = platforms[Math.floor(Math.random() * platforms.length)];
+    crystals.push({
+      x: rp.x + (Math.random()-0.5)*8,
+      y: rp.y - 5 + Math.random()*3,
+      z: rp.z + (Math.random()-0.5)*8,
+      color: ['#00ffc8','#ff6b6b','#a78bfa','#f97316'][Math.floor(Math.random()*4)],
+      size: 0.3 + Math.random()*0.5
+    });
+  }
+
+  // Lava below
+  platforms.push({ x:0, y:-15, z:0, w:200, h:0.5, d:200, color:'#dc2626', top:'#f97316', side:'#991b1b', isLava: true });
+
+  player.x = 0; player.y = 2; player.z = 0;
+  camera.yaw = Math.PI; camera.pitch = 0.3;
+}
+
+function buildMaze() {
+  platforms = [];
+  portals = [];
+  crystals = [];
+  signs = [];
+  enemies = [];
+  mazeWalls = [];
+
+  const SIZE = 15;
+  const CELL = 3;
+
+  // Generate maze using recursive backtracking
+  mazeGrid = [];
+  for (let r = 0; r < SIZE; r++) {
+    mazeGrid[r] = [];
+    for (let c = 0; c < SIZE; c++) {
+      mazeGrid[r][c] = { visited: false, walls: { n:true, s:true, e:true, w:true } };
+    }
+  }
+
+  const stack = [];
+  let cr = 0, cc = 0;
+  mazeGrid[cr][cc].visited = true;
+  stack.push([cr, cc]);
+
+  while (stack.length > 0) {
+    const neighbors = [];
+    if (cr > 0 && !mazeGrid[cr-1][cc].visited) neighbors.push([cr-1, cc, 'n', 's']);
+    if (cr < SIZE-1 && !mazeGrid[cr+1][cc].visited) neighbors.push([cr+1, cc, 's', 'n']);
+    if (cc > 0 && !mazeGrid[cr][cc-1].visited) neighbors.push([cr, cc-1, 'w', 'e']);
+    if (cc < SIZE-1 && !mazeGrid[cr][cc+1].visited) neighbors.push([cr, cc+1, 'e', 'w']);
+
+    if (neighbors.length > 0) {
+      const [nr, nc, wall, opp] = neighbors[Math.floor(Math.random() * neighbors.length)];
+      mazeGrid[cr][cc].walls[wall] = false;
+      mazeGrid[nr][nc].walls[opp] = false;
+      mazeGrid[nr][nc].visited = true;
+      stack.push([cr, cc]);
+      cr = nr; cc = nc;
+    } else {
+      [cr, cc] = stack.pop();
+    }
+  }
+
+  // Floor
+  const totalSize = SIZE * CELL;
+  platforms.push({ x: totalSize/2, y: -0.5, z: totalSize/2, w: totalSize + 4, h: 1, d: totalSize + 4, color: '#1a1a2e', top: '#1e293b', side: '#0f172a' });
+
+  // Build walls from maze grid
+  const wallH = 3.5;
+  const wallT = 0.3;
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const cx = c * CELL + CELL / 2;
+      const cz = r * CELL + CELL / 2;
+      const cell = mazeGrid[r][c];
+
+      if (cell.walls.n) {
+        mazeWalls.push({ x: cx, y: wallH/2, z: cz - CELL/2, w: CELL + wallT, h: wallH, d: wallT });
+      }
+      if (cell.walls.s) {
+        mazeWalls.push({ x: cx, y: wallH/2, z: cz + CELL/2, w: CELL + wallT, h: wallH, d: wallT });
+      }
+      if (cell.walls.w) {
+        mazeWalls.push({ x: cx - CELL/2, y: wallH/2, z: cz, w: wallT, h: wallH, d: CELL + wallT });
+      }
+      if (cell.walls.e) {
+        mazeWalls.push({ x: cx + CELL/2, y: wallH/2, z: cz, w: wallT, h: wallH, d: CELL + wallT });
+      }
+    }
+  }
+
+  // Exit at far corner
+  mazeExit = { x: (SIZE - 1) * CELL + CELL / 2, y: 0, z: (SIZE - 1) * CELL + CELL / 2, w: 2, d: 2 };
+
+  // Enemies
+  const enemyCount = 3;
+  for (let i = 0; i < enemyCount; i++) {
+    const er = Math.floor(SIZE/3) + Math.floor(Math.random() * (SIZE/2));
+    const ec = Math.floor(SIZE/3) + Math.floor(Math.random() * (SIZE/2));
+    enemies.push({
+      x: ec * CELL + CELL/2, y: 0.5, z: er * CELL + CELL/2,
+      speed: 1.5 + Math.random() * 0.5,
+      targetX: 0, targetZ: 0
+    });
+  }
+
+  // Dim crystals
+  for (let i = 0; i < 40; i++) {
+    crystals.push({
+      x: Math.random() * totalSize,
+      y: 0,
+      z: Math.random() * totalSize,
+      color: ['#3b82f6','#6366f1','#8b5cf6'][Math.floor(Math.random()*3)],
+      size: 0.15 + Math.random() * 0.2
+    });
+  }
+
+  player.x = CELL / 2; player.y = 1.5; player.z = CELL / 2;
+  camera.yaw = 0; camera.pitch = 0.3;
+}
+
+// ============================================================
+// PHYSICS
+// ============================================================
+
+function updatePhysics(dt) {
+  // Movement direction based on camera yaw
+  let mx = 0, mz = 0;
+  if (keys['KeyW'] || keys['ArrowUp']) { mx += Math.sin(camera.yaw); mz += Math.cos(camera.yaw); }
+  if (keys['KeyS'] || keys['ArrowDown']) { mx -= Math.sin(camera.yaw); mz -= Math.cos(camera.yaw); }
+  if (keys['KeyA'] || keys['ArrowLeft']) { mx += Math.cos(camera.yaw); mz -= Math.sin(camera.yaw); }
+  if (keys['KeyD'] || keys['ArrowRight']) { mx -= Math.cos(camera.yaw); mz += Math.sin(camera.yaw); }
+
+  const len = Math.sqrt(mx*mx + mz*mz);
+  if (len > 0) { mx /= len; mz /= len; }
+
+  player.vx = mx * player.speed;
+  player.vz = mz * player.speed;
+
+  // Jump
+  if ((keys['Space']) && player.grounded) {
+    player.vy = player.jumpForce;
+    player.grounded = false;
+  }
+
+  // Gravity
+  player.vy += GRAVITY * dt;
+
+  // Apply velocity
+  player.x += player.vx * dt;
+  player.y += player.vy * dt;
+  player.z += player.vz * dt;
+
+  // Platform collision
+  player.grounded = false;
+
+  // Update moving platforms
+  const time = Date.now() / 1000;
+  platforms.forEach(p => {
+    if (p.moving) {
+      if (p.moveAxis === 'x') p.x = p.baseX + Math.sin(time * p.moveSpeed) * p.moveRange;
+      else p.z = p.baseZ + Math.sin(time * p.moveSpeed) * p.moveRange;
+    }
+  });
+
+  const allCollidables = [...platforms.filter(p => !p.isLava && !p.glow), ...mazeWalls.map(w => ({...w, color:'#374151', top:'#4b5563', side:'#1f2937'}))];
+
+  for (const p of allCollidables) {
+    const hw = p.w / 2, hd = p.d / 2;
+    const pLeft = p.x - hw, pRight = p.x + hw;
+    const pFront = p.z - hd, pBack = p.z + hd;
+    const pTop = p.y + (p.h || 0);
+    const pBottom = p.y;
+
+    const pw = player.width / 2;
+
+    // Check if player overlaps horizontally
+    if (player.x + pw > pLeft && player.x - pw < pRight &&
+        player.z + pw > pFront && player.z - pw < pBack) {
+
+      // Landing on top
+      if (player.y - 0.8 <= pTop && player.y - 0.8 > pTop - 0.5 && player.vy <= 0) {
+        player.y = pTop + 0.8;
+        player.vy = 0;
+        player.grounded = true;
+
+        // Check if end platform (parkour)
+        if (p.isEnd && gameState === 'parkour') {
+          winParkour();
+        }
+      }
+      // Side collisions
+      else if (player.y - 0.8 < pTop && player.y + 0.8 > pBottom) {
+        // Push player out
+        const overlapLeft = (player.x + pw) - pLeft;
+        const overlapRight = pRight - (player.x - pw);
+        const overlapFront = (player.z + pw) - pFront;
+        const overlapBack = pBack - (player.z - pw);
+
+        const minOverlap = Math.min(overlapLeft, overlapRight, overlapFront, overlapBack);
+        if (minOverlap === overlapLeft) player.x = pLeft - pw;
+        else if (minOverlap === overlapRight) player.x = pRight + pw;
+        else if (minOverlap === overlapFront) player.z = pFront - pw;
+        else player.z = pBack + pw;
+      }
+    }
+  }
+
+  // Fall off - respawn
+  if (player.y < -12) {
+    if (gameState === 'parkour') {
+      // Respawn at start
+      player.x = 0; player.y = 2; player.z = 0;
+      player.vy = 0;
+      showToast('You fell! Try again', 'error');
+    } else if (gameState === 'lobby') {
+      player.x = 0; player.y = 2; player.z = 8;
+      player.vy = 0;
+    }
+  }
+
+  // Portal detection (lobby only)
+  if (gameState === 'lobby') {
+    for (const portal of portals) {
+      const dx = player.x - portal.x;
+      const dz = player.z - portal.z;
+      const dist = Math.sqrt(dx*dx + dz*dz);
+      if (dist < portal.radius + 0.5) {
+        if (portal.target === 'parkour') {
+          document.exitPointerLock();
+          document.getElementById('parkour-select').classList.remove('hidden');
+        } else if (portal.target === 'maze') {
+          startMaze();
+        } else if (portal.target === 'shop') {
+          document.exitPointerLock();
+          openShop();
+        }
+        // Push player back
+        player.x += (dx / dist) * 2;
+        player.z += (dz / dist) * 2;
+      }
+    }
+  }
+
+  // Enemy AI (maze)
+  if (gameState === 'maze') {
+    enemies.forEach(enemy => {
+      const dx = player.x - enemy.x;
+      const dz = player.z - enemy.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+
+      // Simple chase - move toward player, checking wall collisions
+      if (dist > 0) {
+        const moveX = (dx / dist) * enemy.speed * dt;
+        const moveZ = (dz / dist) * enemy.speed * dt;
+
+        // Check wall collision before moving
+        let canMoveX = true, canMoveZ = true;
+        const ew = 0.3;
+        for (const w of mazeWalls) {
+          const wl = w.x - w.w/2, wr = w.x + w.w/2;
+          const wf = w.z - w.d/2, wb = w.z + w.d/2;
+
+          if (enemy.x + moveX + ew > wl && enemy.x + moveX - ew < wr &&
+              enemy.z + ew > wf && enemy.z - ew < wb) canMoveX = false;
+          if (enemy.x + ew > wl && enemy.x - ew < wr &&
+              enemy.z + moveZ + ew > wf && enemy.z + moveZ - ew < wb) canMoveZ = false;
+        }
+
+        if (canMoveX) enemy.x += moveX;
+        if (canMoveZ) enemy.z += moveZ;
+      }
+
+      // Catch player
+      if (dist < 1.2) {
+        loseMaze();
+      }
+    });
+
+    // Check maze exit
+    if (mazeExit) {
+      const dx = player.x - mazeExit.x;
+      const dz = player.z - mazeExit.z;
+      if (Math.abs(dx) < mazeExit.w && Math.abs(dz) < mazeExit.d) {
+        winMaze();
+      }
+    }
+  }
+
+  // Camera follow
+  const camDist = camera.distance;
+  camera.targetX = player.x - Math.sin(camera.yaw) * camDist * Math.cos(camera.pitch);
+  camera.targetY = player.y + 1 + Math.sin(camera.pitch) * camDist;
+  camera.targetZ = player.z - Math.cos(camera.yaw) * camDist * Math.cos(camera.pitch);
+
+  const smooth = 0.12;
+  camera.x += (camera.targetX - camera.x) * smooth;
+  camera.y += (camera.targetY - camera.y) * smooth;
+  camera.z += (camera.targetZ - camera.z) * smooth;
+}
+
+// ============================================================
+// RENDERING
+// ============================================================
+
+function renderScene() {
+  // Sky / background
+  const time = Date.now() / 1000;
+
+  if (gameState === 'lobby') {
+    const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    grad.addColorStop(0, '#0a0a1a');
+    grad.addColorStop(0.5, '#0f0f2d');
+    grad.addColorStop(1, '#1a0a2e');
+    ctx.fillStyle = grad;
+  } else if (gameState === 'parkour') {
+    const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    grad.addColorStop(0, '#0a0505');
+    grad.addColorStop(0.7, '#1a0a05');
+    grad.addColorStop(1, '#2d1005');
+    ctx.fillStyle = grad;
+  } else if (gameState === 'maze') {
+    const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    grad.addColorStop(0, '#050508');
+    grad.addColorStop(1, '#0a0a15');
+    ctx.fillStyle = grad;
+  } else {
+    ctx.fillStyle = '#0a0a12';
+  }
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Collect all renderable objects and sort by distance
+  const renderList = [];
+
+  // Platforms
+  platforms.forEach(p => {
+    const dx = p.x - camera.x;
+    const dz = p.z - camera.z;
+    const dist = dx*dx + dz*dz;
+    if (dist < 10000) {
+      renderList.push({ dist, fn: () => drawBox(p.x, p.y, p.z, p.w, p.h, p.d, p.top, p.color, p.side, p.glow ? '#00ffc830' : null) });
+    }
+  });
+
+  // Maze walls
+  mazeWalls.forEach(w => {
+    const dx = w.x - camera.x;
+    const dz = w.z - camera.z;
+    const dist = dx*dx + dz*dz;
+    if (dist < 2500) {
+      renderList.push({ dist, fn: () => drawBox(w.x, w.y, w.z, w.w, w.h, w.d, '#374151', '#2d3748', '#1a202c') });
+    }
+  });
+
+  // Maze exit
+  if (mazeExit && gameState === 'maze') {
+    renderList.push({ dist: 0, fn: () => {
+      const pulse = 0.8 + Math.sin(time * 4) * 0.2;
+      drawBox(mazeExit.x, 0, mazeExit.z, mazeExit.w, 0.1, mazeExit.d, `rgba(0,255,200,${pulse})`, '#00ffc840', '#00ffc820');
+      // Beam of light
+      drawBox(mazeExit.x, 0, mazeExit.z, 0.3, 6, 0.3, '#00ffc830', '#00ffc815', '#00ffc815');
+    }});
+  }
+
+  // Crystals
+  crystals.forEach(c => {
+    const dx = c.x - camera.x;
+    const dz = c.z - camera.z;
+    const dist = dx*dx + dz*dz;
+    if (dist < 2500) {
+      renderList.push({ dist, fn: () => drawCrystal(c.x, c.y, c.z, c.color, c.size) });
+    }
+  });
+
+  // Portals
+  portals.forEach(p => {
+    const dx = p.x - camera.x;
+    const dz = p.z - camera.z;
+    renderList.push({ dist: dx*dx + dz*dz, fn: () => drawPortal(p.x, p.y, p.z, p.radius, p.color, p.label) });
+  });
+
+  // Signs
+  signs.forEach(s => {
+    const dx = s.x - camera.x;
+    const dz = s.z - camera.z;
+    renderList.push({ dist: dx*dx + dz*dz, fn: () => drawSign(s.x, s.y, s.z, s.text) });
+  });
+
+  // Enemies
+  enemies.forEach(e => {
+    const dx = e.x - camera.x;
+    const dz = e.z - camera.z;
+    renderList.push({ dist: dx*dx + dz*dz, fn: () => drawEnemy(e) });
+  });
+
+  // Player
+  renderList.push({
+    dist: (player.x - camera.x)**2 + (player.z - camera.z)**2,
+    fn: () => drawPlayer()
+  });
+
+  // Sort back-to-front
+  renderList.sort((a, b) => b.dist - a.dist);
+  renderList.forEach(item => item.fn());
+
+  // Lava glow effect (parkour)
+  if (gameState === 'parkour') {
+    const lavaGlow = 0.1 + Math.sin(time * 2) * 0.05;
+    ctx.fillStyle = `rgba(255, 100, 0, ${lavaGlow})`;
+    ctx.fillRect(0, canvas.height * 0.7, canvas.width, canvas.height * 0.3);
+  }
+
+  // Fog/atmosphere
+  if (gameState === 'maze') {
+    const fogGrad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.width*0.6);
+    fogGrad.addColorStop(0, 'rgba(5,5,10,0)');
+    fogGrad.addColorStop(1, 'rgba(5,5,10,0.7)');
+    ctx.fillStyle = fogGrad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+}
+
+// Minimap for maze
+function renderMinimap() {
+  if (gameState !== 'maze') { document.getElementById('minimap').style.display = 'none'; return; }
+  document.getElementById('minimap').style.display = 'block';
+
+  const mc = document.getElementById('minimap');
+  const mctx = mc.getContext('2d');
+  const SIZE = 15, CELL = 3;
+  const scale = mc.width / (SIZE * CELL);
+
+  mctx.fillStyle = 'rgba(8,8,20,0.9)';
+  mctx.fillRect(0, 0, mc.width, mc.height);
+
+  // Walls
+  mctx.strokeStyle = '#4b5563';
+  mctx.lineWidth = 1;
+  mazeWalls.forEach(w => {
+    mctx.strokeRect(
+      (w.x - w.w/2) * scale,
+      (w.z - w.d/2) * scale,
+      w.w * scale,
+      w.d * scale
+    );
+  });
+
+  // Exit
+  if (mazeExit) {
+    mctx.fillStyle = '#00ffc8';
+    mctx.fillRect(
+      (mazeExit.x - 1) * scale,
+      (mazeExit.z - 1) * scale,
+      2 * scale, 2 * scale
+    );
+  }
+
+  // Enemies
+  enemies.forEach(e => {
+    mctx.fillStyle = '#dc2626';
+    mctx.beginPath();
+    mctx.arc(e.x * scale, e.z * scale, 3, 0, Math.PI * 2);
+    mctx.fill();
+  });
+
+  // Player
+  mctx.fillStyle = '#fbbf24';
+  mctx.beginPath();
+  mctx.arc(player.x * scale, player.z * scale, 4, 0, Math.PI * 2);
+  mctx.fill();
+}
+
+// ============================================================
+// GAME MODES
+// ============================================================
+
+function startParkour(difficulty) {
+  parkourDifficulty = difficulty;
+  document.getElementById('parkour-select').classList.add('hidden');
+  gameState = 'parkour';
+  buildParkour(difficulty);
+  document.getElementById('btn-back-lobby').style.display = 'block';
+  document.getElementById('game-timer').style.display = 'block';
+  document.getElementById('instructions').textContent = 'WASD to move · SPACE to jump · Reach the golden platform!';
+  gameStartTime = Date.now();
+  canvas.requestPointerLock();
+}
+
+function closeParkourSelect() {
+  document.getElementById('parkour-select').classList.add('hidden');
+}
+
+async function winParkour() {
+  if (gameState !== 'parkour') return;
+  gameState = 'result';
+  document.exitPointerLock();
+  const reward = PARKOUR_REWARDS[parkourDifficulty];
+  const elapsed = ((Date.now() - gameStartTime) / 1000).toFixed(1);
+
+  document.getElementById('game-timer').style.display = 'none';
+  document.getElementById('result-title').textContent = '🎉 PARKOUR COMPLETE!';
+  document.getElementById('result-text').textContent = `You completed ${parkourDifficulty} difficulty in ${elapsed}s!`;
+  document.getElementById('result-reward').textContent = `+${reward} 🪙`;
+  document.getElementById('result-overlay').classList.remove('hidden');
+
+  await ensurePlayerData();
+  await addCurrency(reward);
+
+  // Update best time
+  const key = `parkour_${parkourDifficulty}_best`;
+  if (!playerData[key] || parseFloat(elapsed) < playerData[key]) {
+    playerData[key] = parseFloat(elapsed);
+    await window.dataSdk.update(playerData);
+  }
+}
+
+function startMaze() {
+  gameState = 'maze';
+  buildMaze();
+  document.getElementById('btn-back-lobby').style.display = 'block';
+  document.getElementById('game-timer').style.display = 'block';
+  document.getElementById('instructions').textContent = 'WASD to move · Find the green exit · Avoid red enemies!';
+  mazeTimer = 0;
+  gameStartTime = Date.now();
+
+  if (mazeTimerInterval) clearInterval(mazeTimerInterval);
+  mazeTimerInterval = setInterval(() => {
+    mazeTimer = ((Date.now() - gameStartTime) / 1000).toFixed(1);
+    document.getElementById('game-timer').textContent = `⏱ ${mazeTimer}s`;
+  }, 100);
+}
+
+async function winMaze() {
+  if (gameState !== 'maze') return;
+  gameState = 'result';
+  document.exitPointerLock();
+  if (mazeTimerInterval) clearInterval(mazeTimerInterval);
+
+  document.getElementById('game-timer').style.display = 'none';
+  document.getElementById('result-title').textContent = '🎉 MAZE ESCAPED!';
+  document.getElementById('result-text').textContent = `You escaped in ${mazeTimer}s!`;
+  document.getElementById('result-reward').textContent = `+${MAZE_REWARD} 🪙`;
+  document.getElementById('result-overlay').classList.remove('hidden');
+
+  await ensurePlayerData();
+  await addCurrency(MAZE_REWARD);
+  playerData.maze_wins = (playerData.maze_wins || 0) + 1;
+  await window.dataSdk.update(playerData);
+}
+
+async function loseMaze() {
+  if (gameState !== 'maze') return;
+  gameState = 'result';
+  document.exitPointerLock();
+  if (mazeTimerInterval) clearInterval(mazeTimerInterval);
+
+  document.getElementById('game-timer').style.display = 'none';
+  document.getElementById('result-title').textContent = '💀 CAUGHT!';
+  document.getElementById('result-text').textContent = 'An enemy caught you! Better luck next time.';
+  document.getElementById('result-reward').textContent = '+0 🪙';
+  document.getElementById('result-overlay').classList.remove('hidden');
+}
+
+function returnToLobby() {
+  gameState = 'lobby';
+  document.getElementById('result-overlay').classList.add('hidden');
+  document.getElementById('btn-back-lobby').style.display = 'none';
+  document.getElementById('game-timer').style.display = 'none';
+  document.getElementById('instructions').textContent = 'WASD to move · SPACE to jump · Walk into portals to enter';
+  if (mazeTimerInterval) clearInterval(mazeTimerInterval);
+  buildLobby();
+}
+
+// ============================================================
+// SHOP
+// ============================================================
+
+async function openShop() {
+  await ensurePlayerData();
+  document.getElementById('shop-overlay').classList.remove('hidden');
+  updateCurrencyUI();
+  showShopTab('hats');
+}
+
+function closeShop() {
+  document.getElementById('shop-overlay').classList.add('hidden');
+}
+
+function showShopTab(tab) {
+  currentShopTab = tab;
+  ['hats','masks','faces'].forEach(t => {
+    document.getElementById(`tab-${t}`).className = t === tab ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-secondary';
+  });
+  renderShopItems();
+}
+
+function renderShopItems() {
+  const container = document.getElementById('shop-items');
+  const items = COSMETICS[currentShopTab];
+  const type = currentShopTab.slice(0, -1); // hat, mask, face
+
+  container.innerHTML = items.map(item => {
+    const owned = isOwned(item.id);
+    const equipped = playerData && playerData[`equipped_${type}`] === item.id;
+    let btnHtml;
+    if (equipped) {
+      btnHtml = `<button class="btn btn-sm" style="background:#374151;color:#9ca3af;cursor:default;" disabled>Equipped</button>`;
+    } else if (owned) {
+      btnHtml = `<button class="btn btn-sm btn-primary" onclick="equipItem('${type}','${item.id}')">Equip</button>`;
+    } else {
+      btnHtml = `<button class="btn btn-sm btn-secondary" onclick="buyItem('${type}','${item.id}',${item.price})">Buy ${item.price} 🪙</button>`;
+    }
+
+    return `
+      <div class="shop-item ${owned ? 'owned' : ''} ${equipped ? 'equipped' : ''}">
+        <div class="item-preview">${item.emoji}</div>
+        <p style="color:#e2e8f0;font-weight:600;margin-bottom:8px;">${item.name}</p>
+        ${btnHtml}
+      </div>
+    `;
+  }).join('');
+}
+
+async function buyItem(type, id, price) {
+  await ensurePlayerData();
+  if ((playerData.currency || 0) < price) {
+    showToast('Not enough coins!', 'error');
+    return;
+  }
+  const success = await spendCurrency(price);
+  if (success) {
+    await ownCosmetic(id);
+    await equipItem(type, id);
+    showToast(`Purchased! -${price} 🪙`, 'success');
+  }
+}
+
+async function equipItem(type, id) {
+  await ensurePlayerData();
+  player[type] = id;
+  await saveCosmetic(type, id);
+  renderShopItems();
+  showToast(`Equipped ${id}!`, 'success');
+}
+
+// ============================================================
+// GAME LOOP
+// ============================================================
+
+let lastTime = 0;
+
+function gameLoop(timestamp) {
+  const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+  lastTime = timestamp;
+
+  resize();
+
+  if (gameState === 'lobby' || gameState === 'parkour' || gameState === 'maze') {
+    updatePhysics(dt);
+    renderScene();
+    renderMinimap();
+
+    // Timer display for parkour
+    if (gameState === 'parkour') {
+      const elapsed = ((Date.now() - gameStartTime) / 1000).toFixed(1);
+      document.getElementById('game-timer').textContent = `⏱ ${elapsed}s`;
+    }
+  } else if (gameState === 'result') {
+    renderScene(); // Keep showing last scene
+  } else if (gameState === 'loading') {
+    // Show loading
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+
+async function init() {
+  // Show loading for 2s
+  setTimeout(async () => {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('hud').classList.remove('hidden');
+    gameState = 'lobby';
+    buildLobby();
+    await ensurePlayerData();
+    showToast('Welcome to Nexus Arena!', 'info');
+  }, 2200);
+
+  requestAnimationFrame(gameLoop);
+}
+
+init();
+lucide.createIcons();
+</script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9dc5300a32c62caf',t:'MTc3MzUxMTMyOC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
